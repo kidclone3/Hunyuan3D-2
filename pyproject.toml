@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hy3dgen"
+version = "2.0.2"
+description = "Hunyuan3D 2.0 image-to-3D generation"
+readme = "README.md"
+requires-python = ">=3.10,<3.13"
+license = { file = "LICENSE" }
+dependencies = [
+    "accelerate",
+    "diffusers",
+    "einops",
+    "fastapi",
+    "gradio",
+    "ninja",
+    "numpy",
+    "omegaconf",
+    "onnxruntime",
+    "opencv-python",
+    "pybind11",
+    "pygltflib",
+    "pymeshlab",
+    "pyyaml",
+    "rembg",
+    "torch",
+    "torchvision",
+    "tqdm>=4.66.3",
+    "transformers>=4.48.0",
+    "trimesh",
+    "uvicorn",
+    "xatlas",
+]
+
+[project.urls]
+Repository = "https://github.com/kidclone3/Hunyuan3D-2"
+
+[tool.setuptools.packages.find]
+include = ["hy3dgen*"]
+
+[tool.setuptools.package-data]
+hy3dgen = ["assets/*", "assets/**/*"]

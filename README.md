@@ -172,17 +172,16 @@ Hunyuan3D 2.0 supports Macos, Windows, Linux. You may follow the next steps to u
 
 ### Install Requirements
 
-Please install Pytorch via the [official](https://pytorch.org/) site. Then install the other requirements via
+Install the project and its locked dependencies with [uv](https://docs.astral.sh/uv/):
 
 ```bash
-pip install -r requirements.txt
-pip install -e .
+uv sync
 # for texture
 cd hy3dgen/texgen/custom_rasterizer
-python3 setup.py install
+uv run python setup.py install
 cd ../../..
 cd hy3dgen/texgen/differentiable_renderer
-python3 setup.py install
+uv run python setup.py install
 ```
 
 ### Code Usage
@@ -252,7 +251,7 @@ You can launch the API server with a fixed geometry-quality profile. The server
 accepts image-to-3D requests and can optionally texture generated or existing meshes.
 
 ```bash
-python api_server.py --host 0.0.0.0 --port 8080 \
+uv run python api_server.py --host 0.0.0.0 --port 8080 \
   --model-profile fast --enable-tex --idle-timeout 300
 ```
 

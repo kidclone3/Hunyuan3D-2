@@ -12,35 +12,8 @@
 # fine-tuning enabling code and other elements of the foregoing made publicly available
 # by Tencent in accordance with TENCENT HUNYUAN COMMUNITY LICENSE AGREEMENT.
 
-from setuptools import setup, find_packages
+from setuptools import setup
 
-setup(
-    name="hy3dgen",
-    version="2.0.2",
-    url="https://github.com/Tencent/Hunyuan3D-2",
-    packages=find_packages(),
-    include_package_data=True,
-    package_data={"hy3dgen": ["assets/*", "assets/**/*"]},
-    install_requires=[
-        'gradio',
-        "tqdm>=4.66.3",
-        'numpy',
-        'ninja',
-        'diffusers',
-        'pybind11',
-        'opencv-python',
-        'einops',
-        "transformers>=4.48.0",
-        'omegaconf',
-        'trimesh',
-        'pymeshlab',
-        'pygltflib',
-        'xatlas',
-        'accelerate',
-        'gradio',
-        'fastapi',
-        'uvicorn',
-        'rembg',
-        'onnxruntime'
-    ]
-)
+# Project metadata and dependencies live in pyproject.toml. This shim remains
+# for compatibility with tooling that still invokes setup.py directly.
+setup()

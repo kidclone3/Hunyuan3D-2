@@ -7,22 +7,22 @@ Choose one installed geometry profile when starting the server:
 
 ```bash
 # Mini Turbo geometry; unload GPU models after five idle minutes.
-python api_server.py --host 0.0.0.0 --port 8080 \
+uv run python api_server.py --host 0.0.0.0 --port 8080 \
   --model-profile fast --enable-tex --idle-timeout 300
 
 # Full-quality geometry without the texture pipeline.
-python api_server.py --host 0.0.0.0 --port 8080 \
+uv run python api_server.py --host 0.0.0.0 --port 8080 \
   --model-profile quality
 ```
 
-Running `python api_server.py` loads defaults from
+Running `uv run python api_server.py` loads defaults from
 `config/api_server.yaml`. Explicit command-line arguments override YAML values;
 settings omitted from YAML use defaults defined in `api_server.py`.
 
 Use another configuration file with `--config`:
 
 ```bash
-python api_server.py --config config/quality.yaml --port 8189
+uv run python api_server.py --config config/quality.yaml --port 8189
 ```
 
 Both `--enable-tex` and `--disable-tex` are available so the YAML boolean can
