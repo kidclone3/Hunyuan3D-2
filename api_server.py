@@ -33,6 +33,7 @@ from pathlib import Path
 import torch
 import trimesh
 import uvicorn
+import yaml
 from PIL import Image
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, FileResponse
@@ -66,6 +67,19 @@ MODEL_PROFILES = {
     "quality": ModelProfile("Quality (Full)", "models/Hunyuan3D-2", "tencent/Hunyuan3D-2",
                             "hunyuan3d-dit-v2-0", False, 20),
 }
+
+CODE_DEFAULTS = {
+    "host": "0.0.0.0",
+    "port": 8081,
+    "model_profile": "fast",
+    "model_path": None,
+    "subfolder": None,
+    "tex_model_path": "models/Hunyuan3D-2",
+    "device": "cuda",
+    "idle_timeout": 300.0,
+    "enable_tex": False,
+}
+CONFIG_KEYS = set(CODE_DEFAULTS)
 
 
 class ApiError(Exception):
@@ -113,6 +127,59 @@ def error_response(error):
         "retryable": error.retryable,
         "details": error.details,
     }}, status_code=error.status_code)
+
+
+def load_server_config(config_path, required=False):
+    path = Path(config_path).expanduser()
+    if not path.is_absolute():
+        path = PROJECT_ROOT / path
+    if not path.exists():
+        if required:
+            raise ValueError(f"Config file does not exist: {path}")
+        return {}
+    try:
+        with path.open("r", encoding="utf-8") as config_file:
+            config = yaml.safe_load(config_file) or {}
+    except (OSError, yaml.YAMLError) as exc:
+        raise ValueError(f"Could not read config file {path}: {exc}") from exc
+    if not isinstance(config, dict):
+        raise ValueError(f"Config file must contain a YAML mapping: {path}")
+    unknown = set(config) - CONFIG_KEYS
+    if unknown:
+        raise ValueError(f"Unknown config keys: {', '.join(sorted(unknown))}")
+    expected_types = {
+        "host": str, "port": int, "model_profile": str,
+        "model_path": (str, type(None)), "subfolder": (str, type(None)),
+        "tex_model_path": str, "device": str,
+        "idle_timeout": (int, float), "enable_tex": bool,
+    }
+    for key, value in config.items():
+        if not isinstance(value, expected_types[key]) or (
+                key in {"port", "idle_timeout"} and isinstance(value, bool)):
+            raise ValueError(f"Invalid value type for '{key}' in {path}")
+    return config
+
+
+def build_argument_parser(config=None):
+    defaults = dict(CODE_DEFAULTS)
+    defaults.update(config or {})
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config", default="config/api_server.yaml")
+    parser.add_argument("--host", type=str, default=defaults["host"])
+    parser.add_argument("--port", type=int, default=defaults["port"])
+    parser.add_argument("--model-profile", choices=MODEL_PROFILES, default=defaults["model_profile"])
+    parser.add_argument("--model-path", "--model_path", dest="model_path", default=defaults["model_path"])
+    parser.add_argument("--subfolder", default=defaults["subfolder"])
+    parser.add_argument("--tex-model-path", "--tex_model_path", dest="tex_model_path",
+                        default=defaults["tex_model_path"])
+    parser.add_argument("--device", type=str, default=defaults["device"])
+    parser.add_argument("--idle-timeout", type=float, default=defaults["idle_timeout"],
+                        help="Unload GPU models after this many idle seconds; 0 disables unloading")
+    texture_group = parser.add_mutually_exclusive_group()
+    texture_group.add_argument('--enable-tex', '--enable_tex', dest='enable_tex', action='store_true')
+    texture_group.add_argument('--disable-tex', dest='enable_tex', action='store_false')
+    parser.set_defaults(enable_tex=defaults["enable_tex"])
+    return parser
 
 handler = None
 
@@ -463,19 +530,23 @@ async def status(uid: str):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--host", type=str, default="0.0.0.0")
-    parser.add_argument("--port", type=int, default=8081)
-    parser.add_argument("--model-profile", choices=MODEL_PROFILES, default="fast")
-    parser.add_argument("--model-path", "--model_path", dest="model_path")
-    parser.add_argument("--subfolder")
-    parser.add_argument("--tex-model-path", "--tex_model_path", dest="tex_model_path",
-                        default='models/Hunyuan3D-2')
-    parser.add_argument("--device", type=str, default="cuda")
-    parser.add_argument("--idle-timeout", type=float, default=300,
-                        help="Unload GPU models after this many idle seconds; 0 disables unloading")
-    parser.add_argument('--enable-tex', '--enable_tex', dest='enable_tex', action='store_true')
+    config_parser = argparse.ArgumentParser(add_help=False)
+    config_parser.add_argument("--config", default="config/api_server.yaml")
+    config_args, _ = config_parser.parse_known_args()
+    config_was_explicit = any(
+        argument == "--config" or argument.startswith("--config=")
+        for argument in sys.argv[1:]
+    )
+    try:
+        server_config = load_server_config(config_args.config, required=config_was_explicit)
+    except ValueError as exc:
+        config_parser.error(str(exc))
+    parser = build_argument_parser(server_config)
     args = parser.parse_args()
+    if not isinstance(args.enable_tex, bool):
+        parser.error("enable_tex must be true or false")
+    if args.model_profile not in MODEL_PROFILES:
+        parser.error(f"unknown model profile: {args.model_profile}")
     if args.idle_timeout < 0:
         parser.error("--idle-timeout must be zero or greater")
     try:

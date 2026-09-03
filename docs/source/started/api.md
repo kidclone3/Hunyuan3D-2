@@ -15,6 +15,19 @@ python api_server.py --host 0.0.0.0 --port 8080 \
   --model-profile quality
 ```
 
+Running `python api_server.py` loads defaults from
+`config/api_server.yaml`. Explicit command-line arguments override YAML values;
+settings omitted from YAML use defaults defined in `api_server.py`.
+
+Use another configuration file with `--config`:
+
+```bash
+python api_server.py --config config/quality.yaml --port 8189
+```
+
+Both `--enable-tex` and `--disable-tex` are available so the YAML boolean can
+be overridden in either direction.
+
 The available profiles are `fast`, `balanced`, and `quality`. A profile must be
 installed under `models/` before it can be selected. `--model-path` and
 `--subfolder` remain available as advanced overrides. Set `--idle-timeout 0` to

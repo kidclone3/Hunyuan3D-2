@@ -12,6 +12,7 @@ torchvision
 #ConfigArgParse
 #ipdb
 omegaconf
+pyyaml
 
 #sentencepiece
 tqdm

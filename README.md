@@ -261,6 +261,9 @@ are selectable. Use `GET /v1/config` and `GET /v1/models` to discover the active
 profile and server capabilities. GPU models unload after five idle minutes by
 default and reload on the next request.
 
+Default server settings are loaded from `config/api_server.yaml`. CLI arguments
+override configured values, while omitted YAML settings retain their code defaults.
+
 A demo post request for image to 3D without texture.
 
 ```bash
