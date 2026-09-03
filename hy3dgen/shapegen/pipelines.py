@@ -264,15 +264,18 @@ class Hunyuan3DDiTPipeline:
         replace_vae=True,
     ):
         if enabled:
-            model_path = self.kwargs['from_pretrained_kwargs']['model_path']
+            configured_model_path = self.kwargs['from_pretrained_kwargs']['model_path']
             turbo_vae_mapping = {
                 'Hunyuan3D-2': ('tencent/Hunyuan3D-2', 'hunyuan3d-vae-v2-0-turbo'),
                 'Hunyuan3D-2mv': ('tencent/Hunyuan3D-2', 'hunyuan3d-vae-v2-0-turbo'),
                 'Hunyuan3D-2mini': ('tencent/Hunyuan3D-2mini', 'hunyuan3d-vae-v2-mini-turbo'),
             }
-            model_name = model_path.split('/')[-1]
+            model_name = configured_model_path.rstrip('/').split('/')[-1]
             if replace_vae and model_name in turbo_vae_mapping:
                 model_path, subfolder = turbo_vae_mapping[model_name]
+                local_vae = os.path.join(configured_model_path, subfolder)
+                if os.path.isdir(local_vae):
+                    model_path = configured_model_path
                 self.vae = ShapeVAE.from_pretrained(
                     model_path, subfolder=subfolder,
                     use_safetensors=self.kwargs['from_pretrained_kwargs']['use_safetensors'],

@@ -54,6 +54,14 @@ class Hunyuan3DProperties(bpy.types.PropertyGroup):
         name="Status Message",
         default=""
     )
+    server_profile: StringProperty(
+        name="Active Model",
+        default="Not checked"
+    )
+    server_status: StringProperty(
+        name="Server Status",
+        default="Click Refresh Server"
+    )
     # 添加图片路径属性
     image_path: StringProperty(
         name="Image",
@@ -72,7 +80,7 @@ class Hunyuan3DProperties(bpy.types.PropertyGroup):
         name="Number of Inference Steps",
         description="Number of inference steps for the 3D generation",
         default=20,
-        min=20,
+        min=1,
         max=50
     )
     guidance_scale: FloatProperty(
@@ -132,8 +140,8 @@ class Hunyuan3DOperator(bpy.types.Operator):
         self.guidance_scale = props.guidance_scale
         self.texture = props.texture  # 获取 texture 属性的值
 
-        if self.prompt == "" and self.image_path == "":
-            self.report({'WARNING'}, "Please enter some text or select an image first.")
+        if self.image_path == "":
+            self.report({'WARNING'}, "Please select an image. Text-to-image is disabled by the server.")
             return {'FINISHED'}
 
         # 保存选中的 mesh 对象引用
@@ -202,7 +210,7 @@ class Hunyuan3DOperator(bpy.types.Operator):
                             "num_inference_steps": self.num_inference_steps,
                             "guidance_scale": self.guidance_scale,
                             "texture": self.texture  # 传递 texture 参数
-                        },
+                        }, timeout=600,
                     )
                 else:
                     self.report({'INFO'}, f"Post Texturing with Text")
@@ -215,7 +223,7 @@ class Hunyuan3DOperator(bpy.types.Operator):
                             "num_inference_steps": self.num_inference_steps,
                             "guidance_scale": self.guidance_scale,
                             "texture": self.texture  # 传递 texture 参数
-                        },
+                        }, timeout=600,
                     )
             else:
                 if self.image_path:
@@ -237,7 +245,7 @@ class Hunyuan3DOperator(bpy.types.Operator):
                             "num_inference_steps": self.num_inference_steps,
                             "guidance_scale": self.guidance_scale,
                             "texture": self.texture  # 传递 texture 参数
-                        },
+                        }, timeout=600,
                     )
                 else:
                     self.report({'INFO'}, f"Post Start Text to 3D")
@@ -249,7 +257,7 @@ class Hunyuan3DOperator(bpy.types.Operator):
                             "num_inference_steps": self.num_inference_steps,
                             "guidance_scale": self.guidance_scale,
                             "texture": self.texture  # 传递 texture 参数
-                        },
+                        }, timeout=600,
                     )
             self.report({'INFO'}, f"Post Done")
             self.task_finished = True
@@ -257,7 +265,13 @@ class Hunyuan3DOperator(bpy.types.Operator):
             props.is_processing = False
 
             if response.status_code != 200:
-                self.report({'ERROR'}, f"Generation failed: {response.text}")
+                try:
+                    error = response.json().get("error", {})
+                    message = error.get("message", response.text)
+                    code = error.get("code", "REQUEST_FAILED")
+                    self.report({'ERROR'}, f"{code}: {message}")
+                except ValueError:
+                    self.report({'ERROR'}, f"Generation failed: {response.text}")
                 return
 
             # Decode base64 and save to temporary file
@@ -296,6 +310,30 @@ class Hunyuan3DOperator(bpy.types.Operator):
             self.selected_mesh_base64 = ""
 
 
+class Hunyuan3DRefreshServerOperator(bpy.types.Operator):
+    bl_idname = "object.hunyuan3d_refresh_server"
+    bl_label = "Refresh Server"
+    bl_description = "Fetch the active model and capabilities from the API server"
+
+    def execute(self, context):
+        props = context.scene.gen_3d_props
+        try:
+            response = requests.get(f"{props.api_url.rstrip('/')}/v1/config", timeout=5)
+            response.raise_for_status()
+            config = response.json()
+            props.server_profile = config.get("geometry_profile", "Unknown")
+            loaded = "loaded" if config.get("models_loaded", True) else "unloaded (idle)"
+            texture = "texture on" if config.get("texture_enabled") else "texture off"
+            props.server_status = f"Ready, {loaded}, {texture}"
+            self.report({'INFO'}, f"Active model: {props.server_profile}")
+            return {'FINISHED'}
+        except Exception as exc:
+            props.server_profile = "Unavailable"
+            props.server_status = str(exc)
+            self.report({'ERROR'}, f"Could not contact server: {exc}")
+            return {'CANCELLED'}
+
+
 class Hunyuan3DPanel(bpy.types.Panel):
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
@@ -307,7 +345,13 @@ class Hunyuan3DPanel(bpy.types.Panel):
         props = context.scene.gen_3d_props
 
         layout.prop(props, "api_url")
-        layout.prop(props, "prompt")
+        layout.operator("object.hunyuan3d_refresh_server", icon='FILE_REFRESH')
+        layout.label(text=f"Active Model: {props.server_profile}")
+        layout.label(text=props.server_status)
+        prompt_row = layout.row()
+        prompt_row.enabled = False
+        prompt_row.prop(props, "prompt")
+        layout.label(text="Text prompts unavailable; select an image.", icon='INFO')
         # 添加图片选择器
         layout.prop(props, "image_path")
         # 添加新属性的 UI 元素
@@ -331,6 +375,7 @@ class Hunyuan3DPanel(bpy.types.Panel):
 
 classes = (
     Hunyuan3DProperties,
+    Hunyuan3DRefreshServerOperator,
     Hunyuan3DOperator,
     Hunyuan3DPanel,
 )

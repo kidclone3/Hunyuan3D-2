@@ -248,12 +248,18 @@ python3 gradio_app.py --model_path tencent/Hunyuan3D-2 --subfolder hunyuan3d-dit
 
 ### API Server
 
-You could launch an API server locally, which you could post web request for Image/Text to 3D, Texturing existing mesh,
-and e.t.c.
+You can launch the API server with a fixed geometry-quality profile. The server
+accepts image-to-3D requests and can optionally texture generated or existing meshes.
 
 ```bash
-python api_server.py --host 0.0.0.0 --port 8080
+python api_server.py --host 0.0.0.0 --port 8080 \
+  --model-profile fast --enable-tex --idle-timeout 300
 ```
+
+Profiles are `fast`, `balanced`, and `quality`; only locally installed profiles
+are selectable. Use `GET /v1/config` and `GET /v1/models` to discover the active
+profile and server capabilities. GPU models unload after five idle minutes by
+default and reload on the next request.
 
 A demo post request for image to 3D without texture.
 
