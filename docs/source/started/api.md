@@ -28,37 +28,6 @@ uv run python api_server.py --config config/quality.yaml --port 8189
 Both `--enable-tex` and `--disable-tex` are available so the YAML boolean can
 be overridden in either direction.
 
-### Authentication
-
-All generation, status, and capability endpoints require a Bearer credential.
-Generate a separate credential for each user:
-
-```bash
-uv run python api_credentials.py create --name alice
-```
-
-The command prints the credential once. Give it to that user securely; the
-SQLite database stores only its salted hash. Generate additional credentials
-the same way for other users.
-
-Clients send it as an HTTP header:
-
-```text
-Authorization: Bearer h3d_<credential-id>_<secret>
-```
-
-`GET /health` remains unauthenticated for service monitoring. The Blender
-add-on has a password-style **API Credential** field and sends this header
-automatically.
-
-Credentials can be listed or revoked independently without restarting the
-server:
-
-```bash
-uv run python api_credentials.py list
-uv run python api_credentials.py revoke <credential-id>
-```
-
 For systemd, copy `deploy/hunyuan3d.service` to `/etc/systemd/system/`, then
 enable the service:
 
@@ -90,7 +59,6 @@ A demo post request for image to 3D without texture.
 img_b64_str=$(base64 -i assets/demo.png)
 curl -X POST "http://localhost:8080/generate" \
      -H "Content-Type: application/json" \
-     -H "Authorization: Bearer $API_KEY" \
      -d '{
            "image": "'"$img_b64_str"'",
          }' \
