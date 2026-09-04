@@ -31,30 +31,38 @@ be overridden in either direction.
 ### Authentication
 
 All generation, status, and capability endpoints require a Bearer credential.
-Set it through the environment rather than committing it to YAML:
+Generate a separate credential for each user:
 
 ```bash
-export HUNYUAN3D_API_KEY="replace-with-a-long-random-credential"
-uv run python api_server.py
+uv run python api_credentials.py create --name alice
 ```
+
+The command prints the credential once. Give it to that user securely; the
+SQLite database stores only its salted hash. Generate additional credentials
+the same way for other users.
 
 Clients send it as an HTTP header:
 
 ```text
-Authorization: Bearer replace-with-a-long-random-credential
+Authorization: Bearer h3d_<credential-id>_<secret>
 ```
 
 `GET /health` remains unauthenticated for service monitoring. The Blender
 add-on has a password-style **API Credential** field and sends this header
 automatically.
 
-For systemd, copy `deploy/hunyuan3d.service` to `/etc/systemd/system/` and
-`deploy/hunyuan3d-api.env.example` to `/etc/hunyuan3d-api.env`. Replace the
-example credential, set the environment file mode to `600`, then enable the
-service:
+Credentials can be listed or revoked independently without restarting the
+server:
 
 ```bash
-sudo chmod 600 /etc/hunyuan3d-api.env
+uv run python api_credentials.py list
+uv run python api_credentials.py revoke <credential-id>
+```
+
+For systemd, copy `deploy/hunyuan3d.service` to `/etc/systemd/system/`, then
+enable the service:
+
+```bash
 sudo systemctl daemon-reload
 sudo systemctl enable --now hunyuan3d
 ```
@@ -82,7 +90,7 @@ A demo post request for image to 3D without texture.
 img_b64_str=$(base64 -i assets/demo.png)
 curl -X POST "http://localhost:8080/generate" \
      -H "Content-Type: application/json" \
-     -H "Authorization: Bearer $HUNYUAN3D_API_KEY" \
+     -H "Authorization: Bearer $API_KEY" \
      -d '{
            "image": "'"$img_b64_str"'",
          }' \

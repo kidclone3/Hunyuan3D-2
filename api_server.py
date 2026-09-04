@@ -22,7 +22,6 @@ import gc
 import logging
 import logging.handlers
 import os
-import secrets
 import sys
 import tempfile
 import threading
@@ -39,6 +38,7 @@ from PIL import Image
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, FileResponse
 
+from api_credentials import verify_credential
 from hy3dgen.rembg import BackgroundRemover
 from hy3dgen.shapegen import Hunyuan3DDiTFlowMatchingPipeline, FloaterRemover, DegenerateFaceRemover, FaceReducer
 from hy3dgen.texgen import Hunyuan3DPaintPipeline
@@ -79,9 +79,10 @@ CODE_DEFAULTS = {
     "device": "cuda",
     "idle_timeout": 300.0,
     "enable_tex": False,
+    "api_key_database": "data/api_keys.sqlite3",
 }
 CONFIG_KEYS = set(CODE_DEFAULTS)
-API_KEY_ENV_VAR = "HUNYUAN3D_API_KEY"
+CREDENTIAL_DATABASE = str(PROJECT_ROOT / CODE_DEFAULTS["api_key_database"])
 
 
 class ApiError(Exception):
@@ -132,13 +133,10 @@ def error_response(error):
 
 
 def authenticate_request(request):
-    expected_key = os.environ.get(API_KEY_ENV_VAR)
-    if not expected_key:
-        raise ApiError(503, "AUTH_NOT_CONFIGURED",
-                       f"Server authentication is not configured; set {API_KEY_ENV_VAR}.")
     authorization = request.headers.get("Authorization", "")
     scheme, separator, supplied_key = authorization.partition(" ")
-    if separator != " " or scheme.lower() != "bearer" or not secrets.compare_digest(supplied_key, expected_key):
+    if (separator != " " or scheme.lower() != "bearer"
+            or not verify_credential(CREDENTIAL_DATABASE, supplied_key)):
         raise ApiError(401, "INVALID_API_KEY", "A valid Bearer API credential is required.")
 
 
@@ -165,6 +163,7 @@ def load_server_config(config_path, required=False):
         "model_path": (str, type(None)), "subfolder": (str, type(None)),
         "tex_model_path": str, "device": str,
         "idle_timeout": (int, float), "enable_tex": bool,
+        "api_key_database": str,
     }
     for key, value in config.items():
         if not isinstance(value, expected_types[key]) or (
@@ -186,6 +185,7 @@ def build_argument_parser(config=None):
     parser.add_argument("--tex-model-path", "--tex_model_path", dest="tex_model_path",
                         default=defaults["tex_model_path"])
     parser.add_argument("--device", type=str, default=defaults["device"])
+    parser.add_argument("--api-key-database", default=defaults["api_key_database"])
     parser.add_argument("--idle-timeout", type=float, default=defaults["idle_timeout"],
                         help="Unload GPU models after this many idle seconds; 0 disables unloading")
     texture_group = parser.add_mutually_exclusive_group()
@@ -570,8 +570,10 @@ if __name__ == "__main__":
         config_parser.error(str(exc))
     parser = build_argument_parser(server_config)
     args = parser.parse_args()
-    if not os.environ.get(API_KEY_ENV_VAR):
-        parser.error(f"{API_KEY_ENV_VAR} must be set")
+    credential_path = Path(args.api_key_database).expanduser()
+    if not credential_path.is_absolute():
+        credential_path = PROJECT_ROOT / credential_path
+    CREDENTIAL_DATABASE = str(credential_path)
     if not isinstance(args.enable_tex, bool):
         parser.error("enable_tex must be true or false")
     if args.model_profile not in MODEL_PROFILES:

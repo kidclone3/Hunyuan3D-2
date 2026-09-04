@@ -1,7 +1,7 @@
 # Command-line arguments override these values. Any omitted setting uses the
 # corresponding default defined in api_server.py.
-# The API credential is intentionally not stored here. Set HUNYUAN3D_API_KEY
-# in the process environment or systemd EnvironmentFile.
+# Credentials are generated and stored as salted hashes in this SQLite file.
+api_key_database: data/api_keys.sqlite3
 host: 0.0.0.0
 port: 8080
 model_profile: fast

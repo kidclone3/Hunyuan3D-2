@@ -262,8 +262,10 @@ default and reload on the next request.
 
 Default server settings are loaded from `config/api_server.yaml`. CLI arguments
 override configured values, while omitted YAML settings retain their code defaults.
-Set `HUNYUAN3D_API_KEY` before startup; API clients and the Blender add-on must
-send that credential as a Bearer token. `GET /health` remains public for monitoring.
+Generate a distinct Bearer credential for each user with
+`uv run python api_credentials.py create --name USER`. Credentials are stored
+as salted hashes and can be independently listed or revoked. The Blender add-on
+sends the supplied credential; `GET /health` remains public for monitoring.
 
 A demo post request for image to 3D without texture.
 
