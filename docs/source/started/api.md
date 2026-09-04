@@ -28,6 +28,37 @@ uv run python api_server.py --config config/quality.yaml --port 8189
 Both `--enable-tex` and `--disable-tex` are available so the YAML boolean can
 be overridden in either direction.
 
+### Authentication
+
+All generation, status, and capability endpoints require a Bearer credential.
+Set it through the environment rather than committing it to YAML:
+
+```bash
+export HUNYUAN3D_API_KEY="replace-with-a-long-random-credential"
+uv run python api_server.py
+```
+
+Clients send it as an HTTP header:
+
+```text
+Authorization: Bearer replace-with-a-long-random-credential
+```
+
+`GET /health` remains unauthenticated for service monitoring. The Blender
+add-on has a password-style **API Credential** field and sends this header
+automatically.
+
+For systemd, copy `deploy/hunyuan3d.service` to `/etc/systemd/system/` and
+`deploy/hunyuan3d-api.env.example` to `/etc/hunyuan3d-api.env`. Replace the
+example credential, set the environment file mode to `600`, then enable the
+service:
+
+```bash
+sudo chmod 600 /etc/hunyuan3d-api.env
+sudo systemctl daemon-reload
+sudo systemctl enable --now hunyuan3d
+```
+
 The available profiles are `fast`, `balanced`, and `quality`. A profile must be
 installed under `models/` before it can be selected. `--model-path` and
 `--subfolder` remain available as advanced overrides. Set `--idle-timeout 0` to
@@ -51,6 +82,7 @@ A demo post request for image to 3D without texture.
 img_b64_str=$(base64 -i assets/demo.png)
 curl -X POST "http://localhost:8080/generate" \
      -H "Content-Type: application/json" \
+     -H "Authorization: Bearer $HUNYUAN3D_API_KEY" \
      -d '{
            "image": "'"$img_b64_str"'",
          }' \

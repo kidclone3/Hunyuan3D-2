@@ -1,0 +1,18 @@
+[Unit]
+Description=Hunyuan3D API server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=delus
+Group=delus
+WorkingDirectory=/home/delus/Hunyuan3D-2
+EnvironmentFile=/etc/hunyuan3d-api.env
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/home/delus/.local/bin/uv run --frozen python api_server.py
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -22,6 +22,7 @@ import gc
 import logging
 import logging.handlers
 import os
+import secrets
 import sys
 import tempfile
 import threading
@@ -80,6 +81,7 @@ CODE_DEFAULTS = {
     "enable_tex": False,
 }
 CONFIG_KEYS = set(CODE_DEFAULTS)
+API_KEY_ENV_VAR = "HUNYUAN3D_API_KEY"
 
 
 class ApiError(Exception):
@@ -127,6 +129,17 @@ def error_response(error):
         "retryable": error.retryable,
         "details": error.details,
     }}, status_code=error.status_code)
+
+
+def authenticate_request(request):
+    expected_key = os.environ.get(API_KEY_ENV_VAR)
+    if not expected_key:
+        raise ApiError(503, "AUTH_NOT_CONFIGURED",
+                       f"Server authentication is not configured; set {API_KEY_ENV_VAR}.")
+    authorization = request.headers.get("Authorization", "")
+    scheme, separator, supplied_key = authorization.partition(" ")
+    if separator != " " or scheme.lower() != "bearer" or not secrets.compare_digest(supplied_key, expected_key):
+        raise ApiError(401, "INVALID_API_KEY", "A valid Bearer API credential is required.")
 
 
 def load_server_config(config_path, required=False):
@@ -446,6 +459,20 @@ app.add_middleware(
 )
 
 
+@app.middleware("http")
+async def api_key_authentication(request: Request, call_next):
+    protected = (
+        request.url.path in {"/generate", "/send"}
+        or request.url.path.startswith(("/v1/", "/status/"))
+    )
+    if protected:
+        try:
+            authenticate_request(request)
+        except ApiError as error:
+            return error_response(error)
+    return await call_next(request)
+
+
 @app.post("/generate")
 async def generate(request: Request):
     logger.info("Worker generating...")
@@ -543,6 +570,8 @@ if __name__ == "__main__":
         config_parser.error(str(exc))
     parser = build_argument_parser(server_config)
     args = parser.parse_args()
+    if not os.environ.get(API_KEY_ENV_VAR):
+        parser.error(f"{API_KEY_ENV_VAR} must be set")
     if not isinstance(args.enable_tex, bool):
         parser.error("enable_tex must be true or false")
     if args.model_profile not in MODEL_PROFILES:

@@ -42,6 +42,12 @@ class Hunyuan3DProperties(bpy.types.PropertyGroup):
         description="URL of the Text-to-3D API service",
         default="http://localhost:8080"
     )
+    api_key: StringProperty(
+        name="API Credential",
+        description="Bearer token configured on the Hunyuan3D API server",
+        default="",
+        subtype='PASSWORD'
+    )
     is_processing: BoolProperty(
         name="Processing",
         default=False
@@ -106,6 +112,7 @@ class Hunyuan3DOperator(bpy.types.Operator):
     job_id = ''
     prompt = ""
     api_url = ""
+    api_key = ""
     image_path = ""
     octree_resolution = 256
     num_inference_steps = 20
@@ -134,6 +141,7 @@ class Hunyuan3DOperator(bpy.types.Operator):
         props = context.scene.gen_3d_props
         self.prompt = props.prompt
         self.api_url = props.api_url
+        self.api_key = props.api_key
         self.image_path = props.image_path
         self.octree_resolution = props.octree_resolution
         self.num_inference_steps = props.num_inference_steps
@@ -203,6 +211,7 @@ class Hunyuan3DOperator(bpy.types.Operator):
                     img_b64_str = base64.b64encode(image_data).decode()
                     response = requests.post(
                         f"{base_url}/generate",
+                        headers={"Authorization": f"Bearer {self.api_key}"},
                         json={
                             "mesh": self.selected_mesh_base64,
                             "image": img_b64_str,
@@ -216,6 +225,7 @@ class Hunyuan3DOperator(bpy.types.Operator):
                     self.report({'INFO'}, f"Post Texturing with Text")
                     response = requests.post(
                         f"{base_url}/generate",
+                        headers={"Authorization": f"Bearer {self.api_key}"},
                         json={
                             "mesh": self.selected_mesh_base64,
                             "text": self.prompt,
@@ -239,6 +249,7 @@ class Hunyuan3DOperator(bpy.types.Operator):
                     img_b64_str = base64.b64encode(image_data).decode()
                     response = requests.post(
                         f"{base_url}/generate",
+                        headers={"Authorization": f"Bearer {self.api_key}"},
                         json={
                             "image": img_b64_str,
                             "octree_resolution": self.octree_resolution,
@@ -251,6 +262,7 @@ class Hunyuan3DOperator(bpy.types.Operator):
                     self.report({'INFO'}, f"Post Start Text to 3D")
                     response = requests.post(
                         f"{base_url}/generate",
+                        headers={"Authorization": f"Bearer {self.api_key}"},
                         json={
                             "text": self.prompt,
                             "octree_resolution": self.octree_resolution,
@@ -318,7 +330,11 @@ class Hunyuan3DRefreshServerOperator(bpy.types.Operator):
     def execute(self, context):
         props = context.scene.gen_3d_props
         try:
-            response = requests.get(f"{props.api_url.rstrip('/')}/v1/config", timeout=5)
+            response = requests.get(
+                f"{props.api_url.rstrip('/')}/v1/config",
+                headers={"Authorization": f"Bearer {props.api_key}"},
+                timeout=5,
+            )
             response.raise_for_status()
             config = response.json()
             props.server_profile = config.get("geometry_profile", "Unknown")
@@ -345,6 +361,7 @@ class Hunyuan3DPanel(bpy.types.Panel):
         props = context.scene.gen_3d_props
 
         layout.prop(props, "api_url")
+        layout.prop(props, "api_key")
         layout.operator("object.hunyuan3d_refresh_server", icon='FILE_REFRESH')
         layout.label(text=f"Active Model: {props.server_profile}")
         layout.label(text=props.server_status)
